@@ -13,9 +13,9 @@ PMS::DATA data; // 데이터를 받아올 객체
 Adafruit_BME280 bme; // I2C
 int led_pin = D5; //led 핀 설정
 
-const char* ssid = "wifi"; //사용하는 Wifi 이름
-const char* password = "12345678"; // 비밀번호
-const char* mqtt_server = "192.168.232.218"; //mqtt 서버 주소(라즈베리파이에서 ifconfig로 inet 주소 확인)**꼭 수정!!!!!!!!!!!!!
+const char* ssid = "koss"; //사용하는 Wifi 이름
+const char* password = "a123456789!"; // 비밀번호
+const char* mqtt_server = "3.34.50.139"; //mqtt 서버 주소(라즈베리파이에서 ifconfig로 inet 주소 확인)**꼭 수정!!!!!!!!!!!!!
 const char* clientName = "030404Client"; // client 이름(생일 추천드려요~)
 
 WiFiClient espClient; // 인터넷과 연결할 수 있는 client 생성
@@ -38,25 +38,6 @@ void setup_wifi() {
    Serial.println("WiFi connected");
    Serial.println("IP address: ");
    Serial.println(WiFi.localIP()); 
-}
-
-//메시지가 들어왔을 때 처리하는 callback 함수
-void callback(char* topic, byte* payload, unsigned int uLen) {
-  char pBuffer[uLen+1];
-  int i;
-  for(i = 0; i < uLen; i++)
-  {
-    pBuffer[i]=(char)payload[i];
-  }
-  Serial.println(pBuffer); // 1 or 2
-  if(pBuffer[0]=='1')
-  {
-    digitalWrite(led_pin, HIGH); // 1이면 led 켜기
-  }
-  else if(pBuffer[0]=='2')
-  {
-    digitalWrite(led_pin, LOW); // 2면 led 끄기
-  } 
 }
 
 //mqtt 연결
@@ -89,8 +70,9 @@ void setup() {
   Serial.println("Start sensor");
   bme.begin();  //bme센서 가동
   setup_wifi(); //Wifi 연결
-  client.setServer(mqtt_server, 1883); //mqtt 서버와 연결(ip, 1883)
-  client.setCallback(callback); //callback 함수 세팅
+  client.setServer(mqtt_server, 1883); //mqtt 서버와 연결(ip, 1883)세팅
+  pinMode(led_pin, OUTPUT);
+  digitalWrite(led_pin, HIGH);
 }
 
 void loop() {
@@ -109,13 +91,25 @@ void loop() {
     int pm1 = data.PM_AE_UG_1_0;  
     int pm25 = data.PM_AE_UG_2_5;
     int pm10 = data.PM_AE_UG_10_0;
-  
-    char message[70] = ""; // 문자열을 위한 공간 마련
-    sprintf(message, "{\"tmp\":%.2f,\"humi\":%.2f,\"pm1\":%d,\"pm25\":%d,\"pm10\":%d}", t, h, pm1, pm25, pm10); //JSON 문자열의 형식으로 온도, 습도, 미세먼지 데이터 담기
 
-    Serial.print("Publish message: ");
-    Serial.println(message);
-    client.publish("sensors", message); // 만든 문자열을 mqtt 서버에 publish
+    if (pm10 >= 4){
+      digitalWrite(led_pin, HIGH);
+    } else {
+      digitalWrite(led_pin, LOW);
+    }
+  
+    char BMEmessage[70] = ""; // 문자열을 위한 공간 마련
+    char PMSmessage[70] = ""; // 문자열을 위한 공간 마련
+    sprintf(BMEmessage, "{\"tmp\":%.2f,\"humi\":%.2f}", t, h); //JSON 문자열의 형식으로 온도, 습도, 미세먼지 데이터 담기
+    sprintf(PMSmessage, "{\"pm1\":%d,\"pm25\":%d,\"pm10\":%d}", pm1, pm25, pm10); //JSON 문자열의 형식으로 온도, 습도, 미세먼지 데이터 담기
+    
+    Serial.print("Publish BMEmessage: ");
+    Serial.println(BMEmessage);
+    Serial.print("Publish PMSmessage: ");
+    Serial.println(PMSmessage);
+
+    client.publish("AD/bme", BMEmessage); // 만든 문자열을 mqtt 서버에 publish
+    client.publish("AD/pms", PMSmessage); // 만든 문자열을 mqtt 서버에 publish
   
     delay(1000); // 1초(1000ms) 주기 
   }
